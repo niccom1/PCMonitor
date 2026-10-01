@@ -1,0 +1,18 @@
+#include "tray.h"
+#include <shellapi.h>
+#include <windows.h>
+#include <cstring>
+#include <string>
+namespace { constexpr UINT ID_OPEN=1001,ID_COPY=1002,ID_CONSOLE=1003,ID_EXIT=1004; std::wstring wide(const std::string&s){if(s.empty())return {};int n=MultiByteToWideChar(CP_UTF8,0,s.data(),(int)s.size(),nullptr,0);std::wstring w(n,L'\0');if(n)MultiByteToWideChar(CP_UTF8,0,s.data(),(int)s.size(),w.data(),n);return w;} }
+TrayApp::TrayApp(int port,std::vector<std::string> ips,std::function<void()> exit):port_(port),localIps_(std::move(ips)),onExit_(std::move(exit)),instance_(GetModuleHandleW(nullptr)){}
+TrayApp::~TrayApp(){shutdown();}
+bool TrayApp::initialize(){WNDCLASSEXW wc{sizeof(wc)};wc.hInstance=instance_;wc.lpfnWndProc=&TrayApp::windowProc;wc.lpszClassName=L"PCMonitorTrayWindow";wc.hIcon=LoadIconW(nullptr,IDI_APPLICATION);if(!RegisterClassExW(&wc)&&GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)return false;window_=CreateWindowExW(0,wc.lpszClassName,L"PCMonitor",0,0,0,0,0,HWND_MESSAGE,nullptr,instance_,this);if(!window_)return false;icon_=LoadIconW(nullptr,IDI_APPLICATION);return addIcon();}
+bool TrayApp::addIcon(){notify_.cbSize=sizeof(notify_);notify_.hWnd=window_;notify_.uID=1;notify_.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;notify_.uCallbackMessage=callbackMessage_;notify_.hIcon=icon_;lstrcpyW(notify_.szTip,L"PCMonitor - 双击打开监控，右键退出");iconAdded_=Shell_NotifyIconW(NIM_ADD,&notify_)==TRUE;return iconAdded_;}
+void TrayApp::deleteIcon(){if(iconAdded_){Shell_NotifyIconW(NIM_DELETE,&notify_);iconAdded_=false;}}
+void TrayApp::shutdown(){deleteIcon();icon_=nullptr;if(window_){DestroyWindow(window_);window_=nullptr;}}
+int TrayApp::messageLoop(){MSG msg;while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}return (int)msg.wParam;}
+void TrayApp::openMonitor(){std::wstring url=L"http://127.0.0.1:"+std::to_wstring(port_);ShellExecuteW(nullptr,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);}
+void TrayApp::copyLanAddress(){std::string ip=localIps_.empty()?"127.0.0.1":localIps_.front();std::wstring text=wide("http://"+ip+":"+std::to_string(port_));if(!OpenClipboard(window_))return;EmptyClipboard();HGLOBAL h=GlobalAlloc(GMEM_MOVEABLE,(text.size()+1)*sizeof(wchar_t));if(h){void*p=GlobalLock(h);memcpy(p,text.c_str(),(text.size()+1)*sizeof(wchar_t));GlobalUnlock(h);SetClipboardData(CF_UNICODETEXT,h);}else CloseClipboard();if(h)CloseClipboard();}
+void TrayApp::showMenu(){HMENU menu=CreatePopupMenu();AppendMenuW(menu,MF_STRING,ID_OPEN,L"打开监控页面");AppendMenuW(menu,MF_STRING,ID_COPY,L"复制局域网地址");AppendMenuW(menu,MF_STRING,ID_CONSOLE,L"显示控制台");AppendMenuW(menu,MF_SEPARATOR,0,nullptr);AppendMenuW(menu,MF_STRING,ID_EXIT,L"退出");POINT pt;GetCursorPos(&pt);SetForegroundWindow(window_);TrackPopupMenu(menu,TPM_RIGHTBUTTON,pt.x,pt.y,0,window_,nullptr);DestroyMenu(menu);}
+LRESULT TrayApp::handleMessage(UINT msg,WPARAM w,LPARAM l){if(msg==callbackMessage_){if(l==WM_LBUTTONDBLCLK)openMonitor();else if(l==WM_RBUTTONUP)showMenu();return 0;}if(msg==WM_COMMAND){switch(LOWORD(w)){case ID_OPEN:openMonitor();break;case ID_COPY:copyLanAddress();break;case ID_CONSOLE:{HWND console=GetConsoleWindow();if(console)ShowWindow(console,SW_SHOW);break;}case ID_EXIT:if(onExit_)onExit_();return 0;} }if(msg==WM_DESTROY){deleteIcon();PostQuitMessage(0);return 0;}return DefWindowProcW(window_,msg,w,l);}
+LRESULT CALLBACK TrayApp::windowProc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){TrayApp* self=reinterpret_cast<TrayApp*>(GetWindowLongPtrW(hwnd,GWLP_USERDATA));if(msg==WM_NCCREATE){auto* cs=reinterpret_cast<CREATESTRUCTW*>(l);self=static_cast<TrayApp*>(cs->lpCreateParams);SetWindowLongPtrW(hwnd,GWLP_USERDATA,(LONG_PTR)self);}return self?self->handleMessage(msg,w,l):DefWindowProcW(hwnd,msg,w,l);}
