@@ -16,4 +16,6 @@
 
 <img width="529" height="909" alt="image" src="https://github.com/user-attachments/assets/d5745778-b2ef-4f41-bf0b-6c2817015ec5" />
 <img width="524" height="915" alt="image" src="https://github.com/user-attachments/assets/6ffbc0a0-14dc-4889-acc5-36c76a9ffbd6" />
+
+
 左下角可以切换全屏.
