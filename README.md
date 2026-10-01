@@ -10,6 +10,8 @@
 
 <img width="399" height="230" alt="image" src="https://github.com/user-attachments/assets/55368567-e046-46ff-89b1-cebdb0932737" />
 <img width="431" height="395" alt="image" src="https://github.com/user-attachments/assets/2a96dde6-1109-4ecd-b8b6-30104ff871c3" />
+
+
 然后在其他设备上输入你获取到的IPv4地址和你的端口号即可打开WebUi.
 
 <img width="529" height="909" alt="image" src="https://github.com/user-attachments/assets/d5745778-b2ef-4f41-bf0b-6c2817015ec5" />
